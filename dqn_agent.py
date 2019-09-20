@@ -36,9 +36,11 @@ class Agent():
         print("Running on: "+str(device))
         
         # Q-Network
-        self.qnetwork_local = QNetwork(state_size, action_size, seed).to(device)
+        self.qnetwork_local = QNetwork(state_size, action_size, seed,
+                                       hidden_layer_1=128, hidden_layer_2=128).to(device)
         
-        self.qnetwork_target = QNetwork(state_size, action_size, seed).to(device)
+        self.qnetwork_target = QNetwork(state_size, action_size, seed,
+                                       hidden_layer_1=128, hidden_layer_2=128).to(device)
         self.qnetwork_target.eval()
         
         self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=LR)
