@@ -36,11 +36,13 @@ class Agent():
         print("Running on: "+str(device))
         
         # Q-Network
+        hidden_layer_1 = 128
+        hidden_layer_2 = 32
         self.qnetwork_local = QNetwork(state_size, action_size, seed,
-                                       hidden_layer_1=128, hidden_layer_2=32).to(device)
+                                       hidden_layer_1=hidden_layer_1, hidden_layer_2=hidden_layer_2).to(device)
         
         self.qnetwork_target = QNetwork(state_size, action_size, seed,
-                                       hidden_layer_1=128, hidden_layer_2=32).to(device)
+                                       hidden_layer_1=hidden_layer_1, hidden_layer_2=hidden_layer_2).to(device)
         self.qnetwork_target.eval()
         
         self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=LR)
@@ -70,15 +72,17 @@ class Agent():
             state (array_like): current state
             eps (float): epsilon, for epsilon-greedy action selection
         """
-        state = torch.from_numpy(state).float().unsqueeze(0).to(device)
-        self.qnetwork_local.eval()
-        with torch.no_grad():
-            action_values = self.qnetwork_local(state)
-        self.qnetwork_local.train()
-
         # Epsilon-greedy action selection
         if random.random() > eps:
+            state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+            
+            self.qnetwork_local.eval()
+            with torch.no_grad():
+                action_values = self.qnetwork_local(state)
+            self.qnetwork_local.train()
+
             return np.argmax(action_values.cpu().data.numpy())
+        
         else:
             return random.choice(np.arange(self.action_size))
 
@@ -93,16 +97,24 @@ class Agent():
         states, actions, rewards, next_states, dones = experiences
 
         ## Compute and minimize the loss
-        with torch.no_grad():
-            # calculate the target rewards for the next_states
-            target_rewards = self.qnetwork_target(next_states)
-            # select the maximum reward for each next_state
-            target_rewards = target_rewards.max(1)[0]
-            # change shape: [batch_size] --> [batch_size, 1]
-            target_rewards = target_rewards.unsqueeze(1)
-            # calculate the discounted target rewards
-            target_rewards = rewards + (gamma * target_rewards * (1 - dones))
 
+        with torch.no_grad():
+            ### Use of Double DQN method
+            
+            ## Select the greedy action using the QNetwork Local
+            self.qnetwork_local.eval()
+            local_rewards = self.qnetwork_local(next_states)
+            greedy_actions = np.argmax(local_rewards, axis=1).unsqueeze(1)
+            self.qnetwork_local.train()
+            
+            ## Get the rewards for the greedy actions using the QNetwork Target
+            target_rewards = self.qnetwork_target(next_states)
+            target_rewards = target_rewards.gather(1, greedy_actions)
+            
+            ## Calculate the rewards
+            target_rewards = rewards + (gamma * target_rewards * (1 - dones))
+            
+            
         # calculate the expected rewards for each action for the states
         expected_rewards = self.qnetwork_local(states) # shape: [batch_size, action_size]
         # get the reward for the action selected for each state
