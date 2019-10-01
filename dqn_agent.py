@@ -17,6 +17,8 @@ UPDATE_EVERY = 4        # how often to update the network
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+USE_DOUBLE_DQN = True
+
 class Agent():
     """Interacts with and learns from the environment."""
 
@@ -100,19 +102,30 @@ class Agent():
 
         with torch.no_grad():
             ### Use of Double DQN method
+            if USE_DOUBLE_DQN:
+                ## Select the greedy action using the QNetwork Local
+                self.qnetwork_local.eval()
+                local_rewards = self.qnetwork_local(next_states)
+                greedy_actions = np.argmax(local_rewards, axis=1).unsqueeze(1)
+                self.qnetwork_local.train()
+
+                ## Get the rewards for the greedy actions using the QNetwork Target
+                target_rewards = self.qnetwork_target(next_states)
+                target_rewards = target_rewards.gather(1, greedy_actions)
+
+                ## Calculate the rewards
+                target_rewards = rewards + (gamma * target_rewards * (1 - dones))
             
-            ## Select the greedy action using the QNetwork Local
-            self.qnetwork_local.eval()
-            local_rewards = self.qnetwork_local(next_states)
-            greedy_actions = np.argmax(local_rewards, axis=1).unsqueeze(1)
-            self.qnetwork_local.train()
-            
-            ## Get the rewards for the greedy actions using the QNetwork Target
-            target_rewards = self.qnetwork_target(next_states)
-            target_rewards = target_rewards.gather(1, greedy_actions)
-            
-            ## Calculate the rewards
-            target_rewards = rewards + (gamma * target_rewards * (1 - dones))
+            ### Use of Fixed Q-Target
+            else:
+                # calculate the target rewards for the next_states
+                target_rewards = self.qnetwork_target(next_states)
+                # select the maximum reward for each next_state
+                target_rewards = target_rewards.max(1)[0]
+                # change shape: [batch_size] --> [batch_size, 1]
+                target_rewards = target_rewards.unsqueeze(1)
+                # calculate the discounted target rewards
+                target_rewards = rewards + (gamma * target_rewards * (1 - dones))
             
             
         # calculate the expected rewards for each action for the states
