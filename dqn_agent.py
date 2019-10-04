@@ -103,35 +103,34 @@ class Agent():
         with torch.no_grad():
             ### Use of Double DQN method
             if USE_DOUBLE_DQN:
-                ## Select the greedy action using the QNetwork Local
-                self.qnetwork_local.eval()
-                local_rewards = self.qnetwork_local(next_states)
-                greedy_actions = np.argmax(local_rewards, axis=1).unsqueeze(1)
-                self.qnetwork_local.train()
+                ## Select the greedy actions using the QNetwork Local
+                # calculate the pair action/reward for each of the next_states
+                next_action_rewards_local = self.qnetwork_local(next_states)
+                # select the action with the maximum reward for each of the next actions
+                greedy_actions_local = next_action_rewards_local.max(dim=1, keepdim=True)[1]
 
                 ## Get the rewards for the greedy actions using the QNetwork Target
-                target_rewards = self.qnetwork_target(next_states)
-                target_rewards = target_rewards.gather(1, greedy_actions)
-
-                ## Calculate the rewards
-                target_rewards = rewards + (gamma * target_rewards * (1 - dones))
-            
+                # calculate the pair action/reward for each of the next_states
+                next_action_rewards_target = self.qnetwork_target(next_states)
+                # get the target reward for each of the greedy actions selected following the local network
+                target_rewards = next_action_rewards_target.gather(1, greedy_actions_local)
+                
             ### Use of Fixed Q-Target
             else:
-                # calculate the target rewards for the next_states
-                target_rewards = self.qnetwork_target(next_states)
-                # select the maximum reward for each next_state
-                target_rewards = target_rewards.max(1)[0]
-                # change shape: [batch_size] --> [batch_size, 1]
-                target_rewards = target_rewards.unsqueeze(1)
-                # calculate the discounted target rewards
-                target_rewards = rewards + (gamma * target_rewards * (1 - dones))
+                # calculate the pair action/reward for each of the next_states
+                next_action_rewards = self.qnetwork_target(next_states)
+                # select the maximum reward for each of the next actions
+                target_rewards = next_action_rewards.max(dim=1, keepdim=True)[0]
+                
+            
+            ## Calculate the discounted target rewards
+            target_rewards = rewards + (gamma * target_rewards * (1 - dones))
             
             
-        # calculate the expected rewards for each action for the states
-        expected_rewards = self.qnetwork_local(states) # shape: [batch_size, action_size]
-        # get the reward for the action selected for each state
-        expected_rewards = expected_rewards.gather(1, actions) # shape: [batch_size, 1]
+        # calculate the pair action/rewards for each of the states
+        expected_action_rewards = self.qnetwork_local(states) # shape: [batch_size, action_size]
+        # get the reward for each of the actions
+        expected_rewards = expected_action_rewards.gather(1, actions) # shape: [batch_size, 1]
         
         # calculate the loss
         loss = F.mse_loss(expected_rewards, target_rewards)
