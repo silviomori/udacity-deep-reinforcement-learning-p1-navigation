@@ -7,6 +7,7 @@ import torch.optim as optim
 
 from model import QNetwork
 from replay_buffer import ReplayBuffer
+from prioritized_replay_buffer import PrioritizedReplayBuffer
 
 
 BUFFER_SIZE = int(1e5)  # replay buffer size
@@ -18,8 +19,8 @@ UPDATE_EVERY = 4        # how often to update the network
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-USE_DOUBLE_DQN = True
-
+USE_DOUBLE_DQN = False
+USE_PRIORITIZED_REPLAY = True
 
 class Agent():
     """Interacts with and learns from the environment."""
@@ -52,7 +53,11 @@ class Agent():
         self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=LR)
 
         # Replay memory
-        self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, seed, device)
+        if USE_PRIORITIZED_REPLAY:
+            self.memory = PrioritizedReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, seed, device, alpha=0.6, beta=0.4)
+        else:
+            self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, seed, device)
+        
         # Initialize time step (for updating every UPDATE_EVERY steps)
         self.t_step = 0
     
@@ -95,10 +100,10 @@ class Agent():
 
         Params
         ======
-            experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done) tuples 
+            experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done, w) tuples 
             gamma (float): discount factor
         """
-        states, actions, rewards, next_states, dones = experiences
+        states, actions, rewards, next_states, dones, w = experiences
 
         ## Compute and minimize the loss
 
@@ -128,15 +133,27 @@ class Agent():
             ## Calculate the discounted target rewards
             target_rewards = rewards + (gamma * target_rewards * (1 - dones))
             
-            
         # calculate the pair action/rewards for each of the states
         expected_action_rewards = self.qnetwork_local(states) # shape: [batch_size, action_size]
         # get the reward for each of the actions
         expected_rewards = expected_action_rewards.gather(1, actions) # shape: [batch_size, 1]
-        
-        # calculate the loss
-        loss = F.mse_loss(expected_rewards, target_rewards)
-        
+
+        if USE_PRIORITIZED_REPLAY:
+            target_rewards.sub_(expected_rewards)
+            target_rewards.squeeze_()
+            target_rewards.pow_(2)
+            
+            with torch.no_grad():
+                td_error = target_rewards.detach()
+                td_error.pow_(0.5)
+                self.memory.update_priorities(td_error)
+            
+            target_rewards.mul_(w)
+            loss = target_rewards.mean()
+        else:
+            # calculate the loss
+            loss = F.mse_loss(expected_rewards, target_rewards)
+
         # perform the back-propagation
         self.optimizer.zero_grad()
         loss.backward()
