@@ -2,26 +2,44 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from collections import OrderedDict
+
 class QNetwork(nn.Module):
     """Actor (Policy) Model."""
 
-    def __init__(self, state_size, action_size, seed, hidden_layer_1=512, hidden_layer_2=512):
+    def __init__(self, state_size, action_size, seed, hidden_layers=[512, 512]):
         """Initialize parameters and build model.
         Params
         ======
             state_size (int): Dimension of each state
             action_size (int): Dimension of each action
             seed (int): Random seed
+            hidden_layers (list): List containing the hidden layer sizes
         """
         super(QNetwork, self).__init__()
         self.seed = torch.manual_seed(seed)
         
-        self.fc1 = nn.Linear(state_size, hidden_layer_1)
-        self.fc2 = nn.Linear(hidden_layer_1, hidden_layer_2)
-        self.fc3 = nn.Linear(hidden_layer_2, action_size)
+        # Create an OrderedDict to store the network layers
+        layers = OrderedDict()
+        
+        # Include state_size and action_size as layers
+        hidden_layers = [state_size] + hidden_layers + [action_size]
+        
+        # Iterate over the parameters to create layers
+        for idx, (hl_in, hl_out) in enumerate(zip(hidden_layers[:-1],hidden_layers[1:])):
+            # Add a linear layer
+            layers['fc'+str(idx)] = nn.Linear(hl_in, hl_out)
+            # Add an activation function
+            layers['activation'+str(idx)] = nn.ReLU()
+        
+        # Remove the last activation layer
+        layers.popitem()
+        
+        # Create the network
+        self.network = nn.Sequential(layers)
         
     def forward(self, state):
         """Build a network that maps state -> action values."""
-        x = F.relu(self.fc1(state))
-        x = F.relu(self.fc2(x))
-        return self.fc3(x)
+        
+        # Perform a feed-forward pass through the network
+        return self.network(state)
