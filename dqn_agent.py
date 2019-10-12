@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from model import QNetwork
+from dueling_model import DuelingQNetwork
 from replay_buffer import ReplayBuffer
 from prioritized_replay_buffer import PrioritizedReplayBuffer
 
@@ -20,7 +21,8 @@ UPDATE_EVERY = 4        # how often to update the network
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 USE_DOUBLE_DQN = False
-USE_PRIORITIZED_REPLAY = True
+USE_PRIORITIZED_REPLAY = False
+USE_DUELING_NETWORK = True
 
 class Agent():
     """Interacts with and learns from the environment."""
@@ -43,11 +45,18 @@ class Agent():
         # Q-Network
         hidden_layers = [128, 32]
         
-        self.qnetwork_local = QNetwork(state_size, action_size, seed, hidden_layers).to(device)
-        
-        self.qnetwork_target = QNetwork(state_size, action_size, seed, hidden_layers).to(device)
-        self.qnetwork_target.eval()
-        
+        if USE_DUELING_NETWORK:
+            self.qnetwork_local = DuelingQNetwork(state_size, action_size, seed, hidden_layers).to(device)
+
+            self.qnetwork_target = DuelingQNetwork(state_size, action_size, seed, hidden_layers).to(device)
+            self.qnetwork_target.eval()
+            
+        else:
+            self.qnetwork_local = QNetwork(state_size, action_size, seed, hidden_layers).to(device)
+
+            self.qnetwork_target = QNetwork(state_size, action_size, seed, hidden_layers).to(device)
+            self.qnetwork_target.eval()
+            
         self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=LR)
 
         # Replay memory
