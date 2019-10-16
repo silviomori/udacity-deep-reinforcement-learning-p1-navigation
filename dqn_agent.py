@@ -14,7 +14,7 @@ from prioritized_replay_buffer import PrioritizedReplayBuffer
 BUFFER_SIZE = int(1e5)  # replay buffer size
 BATCH_SIZE = 64         # minibatch size
 GAMMA = 0.99            # discount factor
-TAU = 1e-3              # for soft update of target parameters
+TAU = 1e-2              # for soft update of target parameters
 LR = 5e-4               # learning rate 
 UPDATE_EVERY = 4        # how often to update the network
 
@@ -22,12 +22,12 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 USE_DOUBLE_DQN = False
 USE_PRIORITIZED_REPLAY = False
-USE_DUELING_NETWORK = True
+USE_DUELING_NETWORK = False
 
 class Agent():
     """Interacts with and learns from the environment."""
 
-    def __init__(self, state_size, action_size, seed):
+    def __init__(self, state_size, action_size, seed, lr_decay=0.9999):
         """Initialize an Agent object.
         
         Params
@@ -35,6 +35,7 @@ class Agent():
             state_size (int): dimension of each state
             action_size (int): dimension of each action
             seed (int): random seed
+            lr_decay (float): multiplicative factor of learning rate decay
         """
         self.state_size = state_size
         self.action_size = action_size
@@ -58,6 +59,8 @@ class Agent():
             self.qnetwork_target.eval()
             
         self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=LR)
+        self.lr_scheduler = optim.lr_scheduler.ExponentialLR(self.optimizer, lr_decay)
+
 
         # Replay memory
         if USE_PRIORITIZED_REPLAY:
@@ -165,6 +168,7 @@ class Agent():
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+        self.lr_scheduler.step()
 
         # ------------------- update target network ------------------- #
         self.soft_update(self.qnetwork_local, self.qnetwork_target, TAU)                     
