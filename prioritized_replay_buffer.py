@@ -4,7 +4,7 @@ import torch
 class PrioritizedReplayBuffer:
     """Fixed-size prioritized buffer to store experience tuples."""
     
-    def __init__(self, action_size, buffer_size, batch_size, seed, device, alpha=0., beta=1.):
+    def __init__(self, action_size, buffer_size, batch_size, seed, device, alpha=0., beta=1., beta_scheduler=1.):
         """Initialize a PrioritizedReplayBuffer object.
 
         Params
@@ -15,6 +15,7 @@ class PrioritizedReplayBuffer:
             seed (int): random seed
             alpha (float): determines how much prioritization is used; α = 0 corresponding to the uniform case
             beta (float): amount of importance-sampling correction; β = 1 fully compensates for the non-uniform probabilities
+            beta_scheduler (float): multiplicative factor (per sample) for increasing beta (should be >= 1.0)
         """
         
         self.action_size = action_size
@@ -24,6 +25,7 @@ class PrioritizedReplayBuffer:
         self.device = device
         self.alpha = alpha
         self.beta = beta
+        self.beta_scheduler = beta_scheduler
         
         # Create a Numpy Array to store tuples of experience
         self.memory = np.empty(buffer_size, dtype=[
@@ -85,6 +87,8 @@ class PrioritizedReplayBuffer:
         np.multiply(self.memory['prob'], self.buffer_size, out=self.w)
         np.power(self.w, -self.beta, out=self.w, where=self.w!=0) # condition to avoid division by zero
         np.divide(self.w, self.w.max(), out=self.w) # normalize the weights
+        
+        self.beta = min(1, self.beta*self.beta_scheduler)
         
         # Split data into new variables
         states = torch.from_numpy(np.vstack(self.memory_samples['state'])).float().to(self.device)

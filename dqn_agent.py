@@ -64,7 +64,8 @@ class Agent():
 
         # Replay memory
         if USE_PRIORITIZED_REPLAY:
-            self.memory = PrioritizedReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, seed, device, alpha=0.6, beta=0.4)
+            self.memory = PrioritizedReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, seed, device,
+                                                  alpha=0.6, beta=0.4, beta_scheduler=1.0)
         else:
             self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, seed, device)
         
