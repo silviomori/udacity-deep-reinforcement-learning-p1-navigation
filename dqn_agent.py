@@ -22,7 +22,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 USE_DOUBLE_DQN = False
 USE_PRIORITIZED_REPLAY = False
-USE_DUELING_NETWORK = False
+USE_DUELING_NETWORK = True
 
 class Agent():
     """Interacts with and learns from the environment."""
@@ -47,9 +47,11 @@ class Agent():
         hidden_layers = [128, 32]
         
         if USE_DUELING_NETWORK:
-            self.qnetwork_local = DuelingQNetwork(state_size, action_size, seed, hidden_layers).to(device)
+            hidden_state_value = [64, 32]
+            
+            self.qnetwork_local = DuelingQNetwork(state_size, action_size, seed, hidden_layers, hidden_state_value).to(device)
 
-            self.qnetwork_target = DuelingQNetwork(state_size, action_size, seed, hidden_layers).to(device)
+            self.qnetwork_target = DuelingQNetwork(state_size, action_size, seed, hidden_layers, hidden_state_value).to(device)
             self.qnetwork_target.eval()
             
         else:

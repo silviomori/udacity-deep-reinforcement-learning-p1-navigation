@@ -7,7 +7,7 @@ from collections import OrderedDict
 class DuelingQNetwork(nn.Module):
     """Actor (Policy) Model."""
 
-    def __init__(self, state_size, action_size, seed, hidden_layers=[512, 512]):
+    def __init__(self, state_size, action_size, seed, hidden_advantage=[512, 512], hidden_state_value=[512,512]):
         """Initialize parameters and build model.
         Params
         ======
@@ -20,8 +20,7 @@ class DuelingQNetwork(nn.Module):
         self.seed = torch.manual_seed(seed)
         
         # Include state_size as the first parameter to create the layers
-        hidden_layers = [state_size] + hidden_layers
-        
+        hidden_layers = [state_size] + hidden_advantage
         
         ## Create the advantage network
         # Create an OrderedDict to store the network layers
@@ -44,6 +43,7 @@ class DuelingQNetwork(nn.Module):
         ## Create the value network
         # Create an OrderedDict to store the network layers
         value_layers = OrderedDict()
+        hidden_layers = [state_size] + hidden_state_value
 
         # Iterate over the parameters to create the value network
         for idx, (hl_in, hl_out) in enumerate(zip(hidden_layers[:-1],hidden_layers[1:])):
